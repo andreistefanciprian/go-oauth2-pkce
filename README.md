@@ -38,8 +38,8 @@ Client (browser/app)                  Auth Server                Resource Server
 - [x] `GenerateCodeChallenge(verifier)` — BASE64URL(SHA256(verifier))
 - [x] `VerifyCodeChallenge(verifier, challenge)` — validates verifier against stored challenge
 - [x] `GenerateState()` — CSRF protection on the `/authorize` redirect
-- [ ] Auth code generator — random opaque token, short-lived
-- [ ] Auth code store — `map[code]→{challenge, client_id, redirect_uri, expiry}`
+- [x] Auth code generator — random opaque token, short-lived
+- [x] Auth code store — `map[code]→{challenge, client_id, redirect_uri, expiry}`
 - [ ] `/authorize` handler — validates client, issues auth code, redirects with `?code=&state=`
 - [ ] `/token` handler — calls `VerifyCodeChallenge`, exchanges code for JWT
 - [ ] JWT issuance — access token (short-lived ~15min) + refresh token
