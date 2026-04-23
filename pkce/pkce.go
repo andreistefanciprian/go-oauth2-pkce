@@ -27,6 +27,18 @@ func GenerateCodeChallenge(verifier string) string {
 	return challenge
 }
 
+// GenerateState returns a random URL-safe string used as the OAuth state parameter.
+// The client sends it in /authorize and must verify it matches on the callback to prevent CSRF.
+func GenerateState() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	state := base64.RawURLEncoding.EncodeToString(b)
+	slog.Info("Generated state", "state", state)
+	return state, nil
+}
+
 // VerifyCodeChallenge checks that SHA256(verifier) matches the stored challenge.
 // Uses constant-time comparison to prevent timing attacks.
 func VerifyCodeChallenge(verifier, challenge string) bool {

@@ -37,7 +37,7 @@ Client (browser/app)                  Auth Server                Resource Server
 - [x] `GenerateCodeVerifier()` — 32-byte random URL-safe string (RFC 7636)
 - [x] `GenerateCodeChallenge(verifier)` — BASE64URL(SHA256(verifier))
 - [x] `VerifyCodeChallenge(verifier, challenge)` — validates verifier against stored challenge
-- [ ] `GenerateState()` — CSRF protection on the `/authorize` redirect
+- [x] `GenerateState()` — CSRF protection on the `/authorize` redirect
 - [ ] Auth code generator — random opaque token, short-lived
 - [ ] Auth code store — `map[code]→{challenge, client_id, redirect_uri, expiry}`
 - [ ] `/authorize` handler — validates client, issues auth code, redirects with `?code=&state=`

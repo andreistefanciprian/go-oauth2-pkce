@@ -50,6 +50,27 @@ func TestCodeChallengeIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestGenerateState(t *testing.T) {
+	s, err := GenerateState()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(s) < 43 {
+		t.Errorf("state too short: %d chars", len(s))
+	}
+	if !unreservedChars.MatchString(s) {
+		t.Errorf("state contains invalid characters: %q", s)
+	}
+}
+
+func TestGenerateStateIsUnique(t *testing.T) {
+	a, _ := GenerateState()
+	b, _ := GenerateState()
+	if a == b {
+		t.Error("two calls returned identical states")
+	}
+}
+
 func TestVerifyCodeChallenge(t *testing.T) {
 	v, _ := GenerateCodeVerifier()
 	c := GenerateCodeChallenge(v)
