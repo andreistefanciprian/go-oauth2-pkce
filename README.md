@@ -113,4 +113,4 @@ The auth server never validates `state` — it has no idea what it means. Only y
 - [x] `/token` handler — calls `VerifyCodeChallenge`, exchanges code for JWT
 - [x] JWT issuance — access token (short-lived ~15min) + refresh token
 - [x] Token store — refresh tokens and revocation
-- [ ] Bearer middleware — resource server validates access token
+- [x] Bearer middleware — resource server validates access token
