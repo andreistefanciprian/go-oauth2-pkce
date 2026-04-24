@@ -90,6 +90,23 @@ Refresh tokens are opaque and server-side, so logout works by simply deleting th
 
 ---
 
+**TokenIssuer vs TokenValidator** — two types, strict separation of concerns:
+
+| | `TokenIssuer` | `TokenValidator` |
+|---|---|---|
+| Used by | Auth server | Resource server |
+| Can issue tokens? | Yes | No |
+| Can verify tokens? | No | Yes |
+| Used at runtime? | Yes (`/token` handler) | Yes (`BearerAuth` middleware) |
+| Used in tests? | Yes (mint tokens) | Yes (assert tokens are valid) |
+
+The auth server never calls `ValidateAccessToken` at runtime — it only issues.
+The resource server never calls `IssueAccessToken` — it only verifies.
+This mirrors production reality: with RS256, the resource server would hold only the
+public key and couldn't issue tokens even if compromised.
+
+---
+
 **state vs code_verifier** — both are random strings but serve different purposes:
 
 | | `code_verifier` | `state` |

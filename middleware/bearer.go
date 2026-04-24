@@ -17,7 +17,7 @@ const ClaimsKey contextKey = "claims"
 // BearerAuth returns an HTTP middleware that validates the JWT in the Authorization header.
 // On success it stores the token claims in the request context for downstream handlers.
 // On failure it returns 401 and stops the chain.
-func BearerAuth(issuer *authserver.TokenIssuer) func(http.Handler) http.Handler {
+func BearerAuth(issuer *authserver.TokenValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token, ok := extractBearerToken(r)

@@ -11,14 +11,15 @@ func decodeJSON(rr *httptest.ResponseRecorder, v any) error {
 }
 
 func TestIssueAndValidateAccessToken(t *testing.T) {
-	ti := NewTokenIssuer(testSigningKey)
+	issuer := NewTokenIssuer(testSigningKey)
+	validator := NewTokenValidator(testSigningKey)
 
-	token, err := ti.IssueAccessToken("user123", "testclient")
+	token, err := issuer.IssueAccessToken("user123", "testclient")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	claims, err := ti.ValidateAccessToken(token)
+	claims, err := validator.ValidateAccessToken(token)
 	if err != nil {
 		t.Fatalf("validation failed: %v", err)
 	}
@@ -35,20 +36,20 @@ func TestIssueAndValidateAccessToken(t *testing.T) {
 }
 
 func TestValidateAccessToken_TamperedToken(t *testing.T) {
-	ti := NewTokenIssuer(testSigningKey)
+	validator := NewTokenValidator(testSigningKey)
 
-	_, err := ti.ValidateAccessToken("not.a.valid.jwt")
+	_, err := validator.ValidateAccessToken("not.a.valid.jwt")
 	if err == nil {
 		t.Error("expected error for tampered token")
 	}
 }
 
 func TestValidateAccessToken_WrongKey(t *testing.T) {
-	ti := NewTokenIssuer(testSigningKey)
-	token, _ := ti.IssueAccessToken("user123", "testclient")
+	issuer := NewTokenIssuer(testSigningKey)
+	token, _ := issuer.IssueAccessToken("user123", "testclient")
 
-	otherIssuer := NewTokenIssuer([]byte("different-key"))
-	_, err := otherIssuer.ValidateAccessToken(token)
+	wrongValidator := NewTokenValidator([]byte("different-key"))
+	_, err := wrongValidator.ValidateAccessToken(token)
 	if err == nil {
 		t.Error("expected error when validating with wrong signing key")
 	}
@@ -88,8 +89,8 @@ func TestHandleToken_ReturnsRealJWT(t *testing.T) {
 		t.Fatalf("decode error: %v", err)
 	}
 
-	// Validate the JWT is real and parseable
-	claims, err := s.Tokens.ValidateAccessToken(resp.AccessToken)
+	validator := NewTokenValidator(testSigningKey)
+	claims, err := validator.ValidateAccessToken(resp.AccessToken)
 	if err != nil {
 		t.Fatalf("access token invalid: %v", err)
 	}

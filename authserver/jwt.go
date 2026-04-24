@@ -13,7 +13,35 @@ import (
 
 const accessTokenTTL = 15 * time.Minute
 
-// TokenIssuer signs JWTs and manages refresh tokens.
+// TokenValidator verifies JWT signatures. Used by the resource server — no issuing capability.
+type TokenValidator struct {
+	signingKey []byte
+}
+
+func NewTokenValidator(signingKey []byte) *TokenValidator {
+	return &TokenValidator{signingKey: signingKey}
+}
+
+// ValidateAccessToken parses and verifies a signed JWT, returning its claims.
+func (tv *TokenValidator) ValidateAccessToken(tokenString string) (jwt.MapClaims, error) {
+	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return tv.signingKey, nil
+	})
+	if err != nil || !token.Valid {
+		return nil, errors.New("invalid token")
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, errors.New("invalid claims")
+	}
+	slog.Info("Validated access token", "subject", claims["sub"])
+	return claims, nil
+}
+
+// TokenIssuer signs and issues tokens. Used by the auth server only.
 type TokenIssuer struct {
 	signingKey []byte
 
@@ -65,29 +93,10 @@ func (ti *TokenIssuer) IssueRefreshToken(subject, clientID string) (string, erro
 	ti.refreshTokens[token] = refreshEntry{
 		ClientID: clientID,
 		Subject:  subject,
-		Expiry:   time.Now().Add(30 * 24 * time.Hour), // 30 days
+		Expiry:   time.Now().Add(30 * 24 * time.Hour),
 	}
 	ti.mu.Unlock()
 
 	slog.Info("Issued refresh token", "subject", subject, "client_id", clientID)
 	return token, nil
-}
-
-// ValidateAccessToken parses and verifies a signed JWT, returning its claims.
-func (ti *TokenIssuer) ValidateAccessToken(tokenString string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return ti.signingKey, nil
-	})
-	if err != nil || !token.Valid {
-		return nil, errors.New("invalid token")
-	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, errors.New("invalid claims")
-	}
-	slog.Info("Validated access token", "subject", claims["sub"])
-	return claims, nil
 }
