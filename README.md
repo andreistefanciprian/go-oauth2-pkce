@@ -118,6 +118,69 @@ public key and couldn't issue tokens even if compromised.
 
 The auth server never validates `state` — it has no idea what it means. Only your app does.
 
+## Running & Testing
+
+**1. Start the servers** (two terminals):
+
+```bash
+go run ./cmd/authserver      # listens on :8080
+go run ./cmd/resourceserver  # listens on :8081
+```
+
+**2. Generate curl commands with real PKCE values:**
+
+```bash
+go run ./cmd/client
+```
+
+This prints the three curl commands with a real verifier, challenge, and state pre-filled.
+
+**3. Get an auth code** (copy the printed Step 1 curl and run it):
+
+```bash
+curl -v "http://localhost:8080/authorize?client_id=myapp&redirect_uri=http://localhost:9000/callback&code_challenge=<challenge>&code_challenge_method=S256&state=<state>"
+```
+
+Copy the `code` value from the `Location` header in the response.
+
+**4. Exchange the code for tokens** — use `jq` to extract just the access token:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/token \
+  -d "grant_type=authorization_code" \
+  -d "code=<PASTE_CODE_HERE>" \
+  -d "code_verifier=<PASTE_VERIFIER_FROM_CLIENT_OUTPUT>" \
+  -d "redirect_uri=http://localhost:9000/callback" \
+  -d "client_id=myapp" | jq -r .access_token)
+```
+
+**5. Call the protected resource:**
+
+```bash
+curl -v http://localhost:8081/profile \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Expected response:
+```json
+{
+  "message": "Successfully authorized with JWT — resource is available",
+  "claims": {
+    "client_id": "myapp",
+    "exp": 1234567890,
+    "iat": 1234567890,
+    "iss": "oauth_play",
+    "sub": "myapp"
+  }
+}
+```
+
+**Run unit tests:**
+
+```bash
+go test ./...
+```
+
 ## Building Blocks
 
 - [x] `GenerateCodeVerifier()` — 32-byte random URL-safe string (RFC 7636)
