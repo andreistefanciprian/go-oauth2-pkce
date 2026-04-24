@@ -62,7 +62,7 @@ The auth server never validates `state` — it has no idea what it means. Only y
 - [x] `GenerateState()` — CSRF protection on the `/authorize` redirect
 - [x] Auth code generator — random opaque token, short-lived
 - [x] Auth code store — `map[code]→{challenge, client_id, redirect_uri, expiry}`
-- [ ] `/authorize` handler — validates client, issues auth code, redirects with `?code=&state=`
+- [x] `/authorize` handler — validates client, issues auth code, redirects with `?code=&state=`
 - [ ] `/token` handler — calls `VerifyCodeChallenge`, exchanges code for JWT
 - [ ] JWT issuance — access token (short-lived ~15min) + refresh token
 - [ ] Token store — refresh tokens and revocation
