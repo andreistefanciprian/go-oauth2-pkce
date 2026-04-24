@@ -1,6 +1,6 @@
 # oauth_play
 
-A learning project for building OAuth 2.1 with PKCE from scratch in Go.
+A learning project for building OAuth 2.1 with PKCE from scratch in Go, built interactively with [Claude AI](https://claude.ai).
 
 ## OAuth 2.1 + PKCE Flow
 
