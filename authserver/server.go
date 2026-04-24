@@ -9,16 +9,18 @@ type Client struct {
 // Server holds the auth server's runtime state.
 type Server struct {
 	Codes   *AuthCodeStore
+	Tokens  *TokenIssuer
 	clients map[string]Client // in prod: replace with Redis/DB lookup
 }
 
-func NewServer(clients []Client) *Server {
+func NewServer(clients []Client, signingKey []byte) *Server {
 	m := make(map[string]Client, len(clients))
 	for _, c := range clients {
 		m[c.ID] = c
 	}
 	return &Server{
 		Codes:   NewAuthCodeStore(),
+		Tokens:  NewTokenIssuer(signingKey),
 		clients: m,
 	}
 }

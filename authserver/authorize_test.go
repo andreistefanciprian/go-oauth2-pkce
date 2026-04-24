@@ -7,13 +7,15 @@ import (
 	"testing"
 )
 
+var testSigningKey = []byte("test-signing-key-not-for-production")
+
 func newTestServer() *Server {
 	return NewServer([]Client{
 		{
 			ID:           "testclient",
 			RedirectURIs: []string{"https://app.example.com/callback"},
 		},
-	})
+	}, testSigningKey)
 }
 
 func TestHandleAuthorize_ValidRequest(t *testing.T) {

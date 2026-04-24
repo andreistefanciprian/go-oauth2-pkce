@@ -71,11 +71,27 @@ func (s *Server) HandleToken(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("PKCE verified, issuing tokens", "client_id", clientID)
 
-	// TODO: replace with real JWT issuance and a persistent refresh token store
+	// subject would normally come from the authenticated user session;
+	// using client_id as a stand-in until a login flow is wired up.
+	subject := clientID
+
+	accessToken, err := s.Tokens.IssueAccessToken(subject, clientID)
+	if err != nil {
+		http.Error(w, "failed to issue access token", http.StatusInternalServerError)
+		return
+	}
+
+	refreshToken, err := s.Tokens.IssueRefreshToken(subject, clientID)
+	if err != nil {
+		http.Error(w, "failed to issue refresh token", http.StatusInternalServerError)
+		return
+	}
+
 	resp := tokenResponse{
-		AccessToken: "stub-access-token",
-		TokenType:   "Bearer",
-		ExpiresIn:   900, // 15 minutes
+		AccessToken:  accessToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    900, // 15 minutes
+		RefreshToken: refreshToken,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
