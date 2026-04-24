@@ -1,4 +1,4 @@
-module github.com/andreistefanciprian/oauth_play
+module github.com/andreistefanciprian/go-oauth2-pkce
 
 go 1.26.1
 

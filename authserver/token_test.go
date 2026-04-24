@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andreistefanciprian/oauth_play/pkce"
+	"github.com/andreistefanciprian/go-oauth2-pkce/pkce"
 )
 
 func setupTokenRequest(t *testing.T, s *Server) (code, verifier string) {

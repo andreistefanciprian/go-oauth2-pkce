@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/andreistefanciprian/oauth_play/authserver"
+	"github.com/andreistefanciprian/go-oauth2-pkce/authserver"
 	"github.com/golang-jwt/jwt/v5"
 )
 

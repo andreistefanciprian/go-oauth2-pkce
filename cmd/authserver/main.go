@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/andreistefanciprian/oauth_play/authserver"
+	"github.com/andreistefanciprian/go-oauth2-pkce/authserver"
 )
 
 var signingKey = []byte("super-secret-signing-key-change-in-prod")

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/andreistefanciprian/oauth_play/authserver"
+	"github.com/andreistefanciprian/go-oauth2-pkce/authserver"
 )
 
 var testSigningKey = []byte("test-signing-key-not-for-production")

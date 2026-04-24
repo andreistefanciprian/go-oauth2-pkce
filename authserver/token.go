@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/andreistefanciprian/oauth_play/pkce"
+	"github.com/andreistefanciprian/go-oauth2-pkce/pkce"
 )
 
 type tokenResponse struct {

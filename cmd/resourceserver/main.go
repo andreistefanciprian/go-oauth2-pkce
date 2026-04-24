@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/andreistefanciprian/oauth_play/authserver"
-	"github.com/andreistefanciprian/oauth_play/middleware"
+	"github.com/andreistefanciprian/go-oauth2-pkce/authserver"
+	"github.com/andreistefanciprian/go-oauth2-pkce/middleware"
 )
 
 // must match the signing key used by the auth server
