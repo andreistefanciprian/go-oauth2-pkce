@@ -10,27 +10,49 @@ Client (browser/app)                  Auth Server                Resource Server
 1.    | GenerateCodeVerifier()             |                            |
       | GenerateCodeChallenge(verifier)    |                            |
       | GenerateState()                    |                            |
+      | save state in session              |                            |
       |                                    |                            |
 2.    |-- GET /authorize ----------------->|                            |
-      |   ?code_challenge=<challenge>      |                            |
-      |   &code_challenge_method=S256      |                            |
-      |   &client_id=...                   |                            |
-      |   &redirect_uri=...                |                            |
-      |   &state=<random>   (CSRF guard)   |                            |
+      |   ?code_challenge=<challenge>      | store: {                   |
+      |   &code_challenge_method=S256      |   code     → auth_code,    |
+      |   &client_id=...                   |   challenge,               |
+      |   &redirect_uri=...                |   client_id,               |
+      |   &state=<random>   (CSRF guard)   |   redirect_uri,            |
+      |                                    |   expiry                   |
+      |                                    | }                          |
+      |                                    | (state is NOT stored —     |
+      |                                    |  just echoed back)         |
       |                                    |                            |
-3.    |<-- redirect with ?code=<auth_code> |                            |
+3.    |<-- redirect to redirect_uri -------|                            |
+      |    ?code=<auth_code>               |                            |
+      |    &state=<random>                 |                            |
+      | verify state matches session  ✓    |                            |
       |                                    |                            |
 4.    |-- POST /token -------------------->|                            |
-      |   grant_type=authorization_code    |                            |
-      |   code=<auth_code>                 |                            |
-      |   code_verifier=<verifier>  <------+-- VerifyCodeChallenge()    |
-      |   redirect_uri=...                 |                            |
+      |   grant_type=authorization_code    | Consume(code):             |
+      |   code=<auth_code>                 |   delete code (single-use) |
+      |   code_verifier=<verifier>         |   VerifyCodeChallenge()    |
+      |   redirect_uri=...                 |   verify redirect_uri      |
+      |                                    |   verify client_id         |
       |                                    |                            |
 5.    |<-- { access_token, refresh_token } |                            |
       |                                    |                            |
 6.    |-- GET /resource ---------------------------------->             |
       |   Authorization: Bearer <token>                                 |
 ```
+
+## Key Distinctions
+
+**state vs code_verifier** — both are random strings but serve different purposes:
+
+| | `code_verifier` | `state` |
+|---|---|---|
+| Protects against | Auth code interception | CSRF attacks |
+| Validated by | Auth server (via `VerifyCodeChallenge`) | Client (compared to session) |
+| How | Transformed into challenge via SHA256 | Sent raw, echoed back unchanged |
+| Auth server stores it? | Yes (as the challenge) | No — just passes it through |
+
+The auth server never validates `state` — it has no idea what it means. Only your app does.
 
 ## Building Blocks
 
