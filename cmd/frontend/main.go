@@ -89,6 +89,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/login", handleLogin)
 	mux.HandleFunc("/callback", handleCallback)
+	mux.HandleFunc("/profile", handleProfile)
 
 	slog.Info("Frontend listening", "addr", ":9000")
 	slog.Info("Open in browser", "url", "http://localhost:9000/login")
@@ -191,6 +192,37 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 // exchangeCode calls POST /token on the auth server.
 // Sending the verifier here is the PKCE proof — the auth server hashes it
 // and compares it to the challenge it stored during /authorize.
+// handleProfile is the protected page the user lands on after login.
+// It reads the session cookie, looks up the JWT in the token store, and
+// calls the API. If the cookie is missing or the session is unknown → redirect to /login.
+func handleProfile(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session_id")
+	if err != nil {
+		// no cookie — user hasn't logged in yet
+		slog.Info("No session cookie, redirecting to login")
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+
+	accessToken, ok := tokens.get(cookie.Value)
+	if !ok {
+		// cookie exists but session not found — expired or invalid
+		slog.Warn("Session not found, redirecting to login", "session_id", cookie.Value)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+
+	profile, err := fetchProfile(accessToken)
+	if err != nil {
+		slog.Error("Profile fetch failed", "error", err)
+		http.Error(w, "failed to fetch profile", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(profile)
+}
+
 func exchangeCode(code, verifier string) (map[string]any, error) {
 	resp, err := http.PostForm(authServer+"/token", url.Values{
 		"grant_type":    {"authorization_code"},

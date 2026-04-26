@@ -207,4 +207,4 @@ go test ./...
 - [x] `generateSessionID()` — random opaque ID given to browser as a cookie
 - [x] Frontend token store — `map[sessionID]→{accessToken}` server holds JWT, browser holds only the ID
 - [x] Updated `GET /callback` — stores token, sets session cookie, redirects to `/profile`
-- [ ] `GET /profile` (frontend) — checks session cookie, calls API, or redirects to `/login`
+- [x] `GET /profile` (frontend) — checks session cookie, calls API, or redirects to `/login`
