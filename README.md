@@ -16,48 +16,56 @@ The API server never sees auth codes or PKCE params, only Bearer tokens.
 ## OAuth 2.1 + PKCE Flow
 
 ```
-Frontend (:9000)          Auth Server (:8080)         API (:8081)
-      |                             |                            |
-      | GET /login                  |                            |
-      | GenerateCodeVerifier()      |                            |
-      | GenerateCodeChallenge()     |                            |
-      | GenerateState()             |                            |
-      | store {state → verifier}    |                            |
-      |   (session store)           |                            |
-1.    |-- GET /authorize ---------->|                            |
-      |   ?code_challenge=<hash>    | store: {                   |
-      |   &code_challenge_method=S256   code → auth_code,        |
-      |   &client_id=...            |   challenge,               |
-      |   &redirect_uri=...         |   client_id,               |
-      |   &state=<random>           |   redirect_uri,            |
-      |                             |   expiry                   |
-      |                             | }                          |
-      |                             | (state NOT stored —        |
-      |                             |  just echoed back)         |
-      |                             |                            |
-2.    |<-- redirect to /callback ---|                            |
-      |    ?code=<auth_code>        |                            |
-      |    &state=<random>          |                            |
-      | GET /callback               |                            |
-      | verify state matches  ✓     |                            |
-      | retrieve verifier from store|                            |
-      |                             |                            |
-3.    |-- POST /token ------------->|                            |
-      |   grant_type=               | Consume(code):             |
-      |     authorization_code      |   delete code (single-use) |
-      |   code=<auth_code>          |   VerifyCodeChallenge()    |
-      |   code_verifier=<verifier>  |   verify redirect_uri      |
-      |   redirect_uri=...          |   verify client_id         |
-      |   client_id=...             |                            |
-      |                             |                            |
-4.    |<-- { access_token,          |                            |
-      |       refresh_token }       |                            |
-      |                             |                            |
-5.    |-- GET /profile ---------------------------------->       |
-      |   Authorization: Bearer <access_token>                   |
-      |                             |   BearerAuth middleware:   |
-      |                             |   ValidateAccessToken()    |
-      |<-- 200 OK + claims ---------------------------           |
+Browser           Frontend (:9000)       Auth Server (:8080)      API (:8081)
+  |                     |                       |                      |
+  |-- GET /profile ----->|                       |                      |
+  |   (no cookie yet)    | no session cookie     |                      |
+  |<-- redirect /login --|                       |                      |
+  |                      |                       |                      |
+  |-- GET /login -------->|                       |                      |
+  |                      | GenerateVerifier()    |                      |
+  |                      | GenerateChallenge()   |                      |
+  |                      | GenerateState()       |                      |
+  |                      | store {state→verifier}|                      |
+  |<-- redirect ---------|                       |                      |
+  |                      |                       |                      |
+1.|-- GET /authorize ---------------------------->|                      |
+  |                      |                       | store: {             |
+  |                      |                       |   code → auth_code,  |
+  |                      |                       |   challenge,         |
+  |                      |                       |   client_id,         |
+  |                      |                       |   redirect_uri,      |
+  |                      |                       |   expiry             |
+  |                      |                       | }                    |
+  |                      |                       | (state NOT stored —  |
+  |                      |                       |  just echoed back)   |
+  |                      |                       |                      |
+2.|<-- redirect /callback ?code=&state= ----------|                      |
+  |                      |                       |                      |
+  |-- GET /callback ----->|                       |                      |
+  |                      | consume(state) ✓       |                      |
+  |                      | retrieve verifier      |                      |
+  |                      |                       |                      |
+3.|                      |-- POST /token -------->|                      |
+  |                      |   code + verifier      | Consume(code):       |
+  |                      |                       |   delete (single-use)|
+  |                      |                       |   VerifyCodeChallenge|
+  |                      |                       |   verify redirect_uri|
+  |                      |                       |   verify client_id   |
+  |                      |                       |                      |
+4.|                      |<-- {access_token,      |                      |
+  |                      |     refresh_token}     |                      |
+  |                      | generateSessionID()    |                      |
+  |                      | store {sessionID→token}|                      |
+  |<-- redirect /profile  |                       |                      |
+  |    Set-Cookie: session_id                     |                      |
+  |                      |                       |                      |
+5.|-- GET /profile ------->|                       |                      |
+  |   Cookie: session_id  | lookup token          |                      |
+  |                      |-- GET /profile -------------------------------->|
+  |                      |   Authorization: Bearer <token>  ValidateJWT() |
+  |                      |<-- 200 OK + claims ---------------------------- |
+  |<-- 200 OK + claims --|                       |                      |
 ```
 
 ## Token Refresh Flow
@@ -193,6 +201,10 @@ go test ./...
 - [x] JWT issuance — access token (short-lived ~15min) + refresh token
 - [x] Token store — refresh tokens and revocation
 - [x] Bearer middleware — API server validates access token
-- [x] `GET /login` — generates PKCE params, stores `{state → verifier}` in session, redirects to auth server
-- [x] `GET /callback` — validates state (CSRF check), retrieves verifier, calls `/token`, calls `/profile`, displays result
+- [x] `GET /login` — generates PKCE params, stores `{state → verifier}`, redirects to auth server
+- [x] `GET /callback` — validates state (CSRF check), retrieves verifier, calls `/token`
 - [x] Session store — `map[state]→{verifier}` (in prod: Redis/DB)
+- [ ] `generateSessionID()` — random opaque ID given to browser as a cookie
+- [ ] Frontend token store — `map[sessionID]→{accessToken}` server holds JWT, browser holds only the ID
+- [ ] Updated `GET /callback` — stores token, sets session cookie, redirects to `/profile`
+- [ ] `GET /profile` (frontend) — checks session cookie, calls API, or redirects to `/login`
