@@ -137,46 +137,28 @@ The auth server never validates `state` — it has no idea what it means. Only y
 
 ## Running & Testing
 
-**1. Start the servers** (two terminals):
+**1. Start all three servers** (three terminals):
 
 ```bash
-go run ./cmd/authserver      # listens on :8080
-go run ./cmd/api  # listens on :8081
+go run ./cmd/authserver   # auth server  :8080
+go run ./cmd/api          # api server   :8081
+go run ./cmd/frontend     # frontend     :9000
 ```
 
-**2. Generate curl commands with real PKCE values:**
+**2. Open in browser:**
 
-```bash
-go run ./cmd/frontend
+```
+http://localhost:9000/login
 ```
 
-This prints the three curl commands with a real verifier, challenge, and state pre-filled.
-
-**3. Get an auth code** (copy the printed Step 1 curl and run it):
-
-```bash
-curl -v "http://localhost:8080/authorize?client_id=myapp&redirect_uri=http://localhost:9000/callback&code_challenge=<challenge>&code_challenge_method=S256&state=<state>"
-```
-
-Copy the `code` value from the `Location` header in the response.
-
-**4. Exchange the code for tokens** — use `jq` to extract just the access token:
-
-```bash
-TOKEN=$(curl -s -X POST http://localhost:8080/token \
-  -d "grant_type=authorization_code" \
-  -d "code=<PASTE_CODE_HERE>" \
-  -d "code_verifier=<PASTE_VERIFIER_FROM_CLIENT_OUTPUT>" \
-  -d "redirect_uri=http://localhost:9000/callback" \
-  -d "client_id=myapp" | jq -r .access_token)
-```
-
-**5. Call the protected resource:**
-
-```bash
-curl -v http://localhost:8081/profile \
-  -H "Authorization: Bearer $TOKEN"
-```
+The frontend automatically:
+1. Generates verifier, challenge, state
+2. Redirects to the auth server `/authorize`
+3. Receives the callback with the auth code
+4. Validates state (CSRF check)
+5. Exchanges the code for tokens via `/token`
+6. Calls `/profile` on the API server with the Bearer token
+7. Displays the response in the browser
 
 Expected response:
 ```json
@@ -211,6 +193,6 @@ go test ./...
 - [x] JWT issuance — access token (short-lived ~15min) + refresh token
 - [x] Token store — refresh tokens and revocation
 - [x] Bearer middleware — API server validates access token
-- [ ] `GET /login` — generates PKCE params, stores `{state → verifier}` in session, redirects to auth server
-- [ ] `GET /callback` — validates state (CSRF check), retrieves verifier, calls `/token`, calls `/profile`, displays result
-- [ ] Session store — `map[state]→{verifier}` (in prod: Redis/DB)
+- [x] `GET /login` — generates PKCE params, stores `{state → verifier}` in session, redirects to auth server
+- [x] `GET /callback` — validates state (CSRF check), retrieves verifier, calls `/token`, calls `/profile`, displays result
+- [x] Session store — `map[state]→{verifier}` (in prod: Redis/DB)
