@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -100,7 +101,17 @@ func (t *tokenStore) get(sessionID string) (string, bool) {
 	return token, ok
 }
 
+func (t *tokenStore) delete(sessionID string) {
+	t.mu.Lock()
+	delete(t.data, sessionID)
+	t.mu.Unlock()
+}
+
 var tokens = &tokenStore{data: make(map[string]string)}
+
+// errUnauthorized is returned by fetchProfile when the API rejects the token (401).
+// handleProfile uses this to distinguish an expired session from other errors.
+var errUnauthorized = errors.New("unauthorized")
 
 // generateSessionID returns a random opaque string used as the session cookie value.
 // The browser holds only this ID — the actual JWT is stored server-side in the token store.
@@ -241,6 +252,20 @@ func handleProfile(w http.ResponseWriter, r *http.Request) {
 
 	profile, err := fetchProfile(accessToken)
 	if err != nil {
+		if errors.Is(err, errUnauthorized) {
+			// Token expired — clear the stale session and send the user back to login.
+			slog.Warn("Access token expired, clearing session", "session_id", cookie.Value)
+			tokens.delete(cookie.Value)
+			http.SetCookie(w, &http.Cookie{
+				Name:     "session_id",
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HttpOnly: true,
+			})
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
 		slog.Error("Profile fetch failed", "error", err)
 		http.Error(w, "failed to fetch profile", http.StatusInternalServerError)
 		return
@@ -292,6 +317,9 @@ func fetchProfile(accessToken string) (map[string]any, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, errUnauthorized
+	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("api returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
