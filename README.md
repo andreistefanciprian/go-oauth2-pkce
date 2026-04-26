@@ -2,45 +2,62 @@
 
 A learning project for building OAuth 2.1 with PKCE from scratch in Go, built interactively with [Claude AI](https://claude.ai).
 
+## Services
+
+| Service | Port | Package | Responsibility |
+|---|---|---|---|
+| Frontend | `:9000` | `cmd/frontend` | Initiates login, handles callback, calls API server |
+| Auth server | `:8080` | `cmd/authserver` | Issues auth codes and JWT tokens |
+| API server | `:8081` | `cmd/api` | Serves protected data, validates JWTs |
+
+The frontend is the only service the user interacts with directly.
+The API server never sees auth codes or PKCE params, only Bearer tokens.
+
 ## OAuth 2.1 + PKCE Flow
 
 ```
-Client (browser/app)                  Auth Server                Resource Server
-      |                                    |                            |
-1.    | GenerateCodeVerifier()             |                            |
-      | GenerateCodeChallenge(verifier)    |                            |
-      | GenerateState()                    |                            |
-      | save state in session              |                            |
-      |                                    |                            |
-2.    |-- GET /authorize ----------------->|                            |
-      |   ?code_challenge=<challenge>      | store: {                   |
-      |   &code_challenge_method=S256      |   code     → auth_code,    |
-      |   &client_id=...                   |   challenge,               |
-      |   &redirect_uri=...                |   client_id,               |
-      |   &state=<random>   (CSRF guard)   |   redirect_uri,            |
-      |                                    |   expiry                   |
-      |                                    | }                          |
-      |                                    | (state is NOT stored —     |
-      |                                    |  just echoed back)         |
-      |                                    |                            |
-3.    |<-- redirect to redirect_uri -------|                            |
-      |    ?code=<auth_code>               |                            |
-      |    &state=<random>                 |                            |
-      | verify state matches session  ✓    |                            |
-      |                                    |                            |
-4.    |-- POST /token -------------------->|                            |
-      |   grant_type=authorization_code    | Consume(code):             |
-      |   code=<auth_code>                 |   delete code (single-use) |
-      |   code_verifier=<verifier>         |   VerifyCodeChallenge()    |
-      |   redirect_uri=...                 |   verify redirect_uri      |
-      |                                    |   verify client_id         |
-      |                                    |                            |
-5.    |<-- { access_token, refresh_token } |                            |
-      |                                    |                            |
-6.    |-- GET /resource ---------------------------------->             |
-      |   Authorization: Bearer <access_token>                          |
-      |                                    |   validate JWT             |
-      |<-- 200 OK -----------------------------------------            |
+Frontend (:9000)          Auth Server (:8080)         API (:8081)
+      |                             |                            |
+      | GET /login                  |                            |
+      | GenerateCodeVerifier()      |                            |
+      | GenerateCodeChallenge()     |                            |
+      | GenerateState()             |                            |
+      | store {state → verifier}    |                            |
+      |   (session store)           |                            |
+1.    |-- GET /authorize ---------->|                            |
+      |   ?code_challenge=<hash>    | store: {                   |
+      |   &code_challenge_method=S256   code → auth_code,        |
+      |   &client_id=...            |   challenge,               |
+      |   &redirect_uri=...         |   client_id,               |
+      |   &state=<random>           |   redirect_uri,            |
+      |                             |   expiry                   |
+      |                             | }                          |
+      |                             | (state NOT stored —        |
+      |                             |  just echoed back)         |
+      |                             |                            |
+2.    |<-- redirect to /callback ---|                            |
+      |    ?code=<auth_code>        |                            |
+      |    &state=<random>          |                            |
+      | GET /callback               |                            |
+      | verify state matches  ✓     |                            |
+      | retrieve verifier from store|                            |
+      |                             |                            |
+3.    |-- POST /token ------------->|                            |
+      |   grant_type=               | Consume(code):             |
+      |     authorization_code      |   delete code (single-use) |
+      |   code=<auth_code>          |   VerifyCodeChallenge()    |
+      |   code_verifier=<verifier>  |   verify redirect_uri      |
+      |   redirect_uri=...          |   verify client_id         |
+      |   client_id=...             |                            |
+      |                             |                            |
+4.    |<-- { access_token,          |                            |
+      |       refresh_token }       |                            |
+      |                             |                            |
+5.    |-- GET /profile ---------------------------------->       |
+      |   Authorization: Bearer <access_token>                   |
+      |                             |   BearerAuth middleware:   |
+      |                             |   ValidateAccessToken()    |
+      |<-- 200 OK + claims ---------------------------           |
 ```
 
 ## Token Refresh Flow
@@ -49,7 +66,7 @@ The access token is short-lived (~15 min). When it expires, the client silently 
 using the refresh token — the user never has to log in again.
 
 ```
-Client (browser/app)                  Auth Server                Resource Server
+Frontend (:9000)                  Auth Server                Resource Server
       |                                    |                            |
 1.    |-- GET /resource ---------------------------------->             |
       |   Authorization: Bearer <expired_access_token>                  |
@@ -84,7 +101,7 @@ no PKCE involved, just the opaque refresh token the client stored from the first
 | Revocable? | No — expires naturally | Yes — delete from store |
 | If stolen | Valid until expiry | Can be revoked immediately |
 
-Access tokens are JWTs so the resource server can verify them locally without calling the auth
+Access tokens are JWTs so the API server can verify them locally without calling the auth
 server. The downside is they can't be revoked — that's why they're kept short-lived.
 Refresh tokens are opaque and server-side, so logout works by simply deleting the store entry.
 
@@ -94,15 +111,15 @@ Refresh tokens are opaque and server-side, so logout works by simply deleting th
 
 | | `TokenIssuer` | `TokenValidator` |
 |---|---|---|
-| Used by | Auth server | Resource server |
+| Used by | Auth server | API server |
 | Can issue tokens? | Yes | No |
 | Can verify tokens? | No | Yes |
 | Used at runtime? | Yes (`/token` handler) | Yes (`BearerAuth` middleware) |
 | Used in tests? | Yes (mint tokens) | Yes (assert tokens are valid) |
 
 The auth server never calls `ValidateAccessToken` at runtime — it only issues.
-The resource server never calls `IssueAccessToken` — it only verifies.
-This mirrors production reality: with RS256, the resource server would hold only the
+The API server never calls `IssueAccessToken` — it only verifies.
+This mirrors production reality: with RS256, the API server would hold only the
 public key and couldn't issue tokens even if compromised.
 
 ---
@@ -124,13 +141,13 @@ The auth server never validates `state` — it has no idea what it means. Only y
 
 ```bash
 go run ./cmd/authserver      # listens on :8080
-go run ./cmd/resourceserver  # listens on :8081
+go run ./cmd/api  # listens on :8081
 ```
 
 **2. Generate curl commands with real PKCE values:**
 
 ```bash
-go run ./cmd/client
+go run ./cmd/frontend
 ```
 
 This prints the three curl commands with a real verifier, challenge, and state pre-filled.
@@ -193,4 +210,7 @@ go test ./...
 - [x] `/token` handler — calls `VerifyCodeChallenge`, exchanges code for JWT
 - [x] JWT issuance — access token (short-lived ~15min) + refresh token
 - [x] Token store — refresh tokens and revocation
-- [x] Bearer middleware — resource server validates access token
+- [x] Bearer middleware — API server validates access token
+- [ ] `GET /login` — generates PKCE params, stores `{state → verifier}` in session, redirects to auth server
+- [ ] `GET /callback` — validates state (CSRF check), retrieves verifier, calls `/token`, calls `/profile`, displays result
+- [ ] Session store — `map[state]→{verifier}` (in prod: Redis/DB)
