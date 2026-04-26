@@ -52,6 +52,29 @@ func (s *sessionStore) consume(state string) (string, bool) {
 
 var store = &sessionStore{data: make(map[string]string)}
 
+// tokenStore holds {sessionID → accessToken} after a successful callback.
+// The browser is given only the sessionID via a cookie — the JWT never leaves the server.
+// in prod: replace with Redis/DB backed sessions
+type tokenStore struct {
+	mu   sync.Mutex
+	data map[string]string // sessionID → accessToken
+}
+
+func (t *tokenStore) save(sessionID, accessToken string) {
+	t.mu.Lock()
+	t.data[sessionID] = accessToken
+	t.mu.Unlock()
+}
+
+func (t *tokenStore) get(sessionID string) (string, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	token, ok := t.data[sessionID]
+	return token, ok
+}
+
+var tokens = &tokenStore{data: make(map[string]string)}
+
 // generateSessionID returns a random opaque string used as the session cookie value.
 // The browser holds only this ID — the actual JWT is stored server-side in the token store.
 func generateSessionID() (string, error) {
