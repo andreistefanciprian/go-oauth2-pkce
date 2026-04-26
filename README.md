@@ -204,7 +204,7 @@ go test ./...
 - [x] `GET /login` — generates PKCE params, stores `{state → verifier}`, redirects to auth server
 - [x] `GET /callback` — validates state (CSRF check), retrieves verifier, calls `/token`
 - [x] Session store — `map[state]→{verifier}` (in prod: Redis/DB)
-- [ ] `generateSessionID()` — random opaque ID given to browser as a cookie
+- [x] `generateSessionID()` — random opaque ID given to browser as a cookie
 - [ ] Frontend token store — `map[sessionID]→{accessToken}` server holds JWT, browser holds only the ID
 - [ ] Updated `GET /callback` — stores token, sets session cookie, redirects to `/profile`
 - [ ] `GET /profile` (frontend) — checks session cookie, calls API, or redirects to `/login`

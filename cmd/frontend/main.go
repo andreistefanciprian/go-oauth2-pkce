@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -49,6 +51,16 @@ func (s *sessionStore) consume(state string) (string, bool) {
 }
 
 var store = &sessionStore{data: make(map[string]string)}
+
+// generateSessionID returns a random opaque string used as the session cookie value.
+// The browser holds only this ID — the actual JWT is stored server-side in the token store.
+func generateSessionID() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
 
 func main() {
 	mux := http.NewServeMux()
