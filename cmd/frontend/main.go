@@ -9,18 +9,45 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 
 	"github.com/andreistefanciprian/go-oauth2-pkce/pkce"
 )
 
-const (
-	clientID    = "myapp"
-	redirectURI = "http://localhost:9000/callback"
-	authServer  = "http://localhost:8080"
-	apiServer   = "http://localhost:8081"
-)
+const clientID = "myapp"
+
+func redirectURI() string {
+	if u := os.Getenv("REDIRECT_URI"); u != "" {
+		return u
+	}
+	return "http://localhost:9000/callback"
+}
+
+// authServerURL is used for server-to-server calls (POST /token) inside Docker.
+func authServerURL() string {
+	if u := os.Getenv("AUTH_SERVER"); u != "" {
+		return u
+	}
+	return "http://localhost:8080"
+}
+
+// authServerPublicURL is used in browser redirects (GET /authorize).
+// Must be reachable from the user's browser, not the Docker network.
+func authServerPublicURL() string {
+	if u := os.Getenv("AUTH_SERVER_PUBLIC"); u != "" {
+		return u
+	}
+	return "http://localhost:8080"
+}
+
+func apiServerURL() string {
+	if u := os.Getenv("API_SERVER"); u != "" {
+		return u
+	}
+	return "http://localhost:8081"
+}
 
 // sessionStore bridges /login and /callback by holding {state → verifier}.
 // The verifier is generated at /login but needed at /callback — it can't travel
@@ -122,9 +149,9 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	// store verifier server-side so /callback can retrieve it by state
 	store.save(state, verifier)
 
-	authorizeURL := fmt.Sprintf("%s/authorize?%s", authServer, url.Values{
+	authorizeURL := fmt.Sprintf("%s/authorize?%s", authServerPublicURL(), url.Values{
 		"client_id":             {clientID},
-		"redirect_uri":          {redirectURI},
+		"redirect_uri":          {redirectURI()},
 		"code_challenge":        {challenge},
 		"code_challenge_method": {"S256"},
 		"state":                 {state},
@@ -224,11 +251,11 @@ func handleProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func exchangeCode(code, verifier string) (map[string]any, error) {
-	resp, err := http.PostForm(authServer+"/token", url.Values{
+	resp, err := http.PostForm(authServerURL()+"/token", url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"code_verifier": {verifier},
-		"redirect_uri":  {redirectURI},
+		"redirect_uri":  {redirectURI()},
 		"client_id":     {clientID},
 	})
 	if err != nil {
@@ -253,7 +280,7 @@ func exchangeCode(code, verifier string) (map[string]any, error) {
 // The API server validates the JWT locally via BearerAuth middleware —
 // no call back to the auth server is needed.
 func fetchProfile(accessToken string) (map[string]any, error) {
-	req, err := http.NewRequest(http.MethodGet, apiServer+"/profile", nil)
+	req, err := http.NewRequest(http.MethodGet, apiServerURL()+"/profile", nil)
 	if err != nil {
 		return nil, err
 	}

@@ -4,16 +4,21 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/andreistefanciprian/go-oauth2-pkce/authserver"
 	"github.com/andreistefanciprian/go-oauth2-pkce/middleware"
 )
 
-// must match the signing key used by the auth server
-var signingKey = []byte("super-secret-signing-key-change-in-prod")
+func signingKey() []byte {
+	if k := os.Getenv("SIGNING_KEY"); k != "" {
+		return []byte(k)
+	}
+	return []byte("super-secret-signing-key-change-in-prod")
+}
 
 func main() {
-	validator := authserver.NewTokenValidator(signingKey)
+	validator := authserver.NewTokenValidator(signingKey())
 
 	mux := http.NewServeMux()
 	mux.Handle("/profile", middleware.BearerAuth(validator)(http.HandlerFunc(profileHandler)))

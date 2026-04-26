@@ -1,0 +1,44 @@
+services:
+
+  authserver:
+    build:
+      context: .
+      args:
+        CMD: authserver
+    ports:
+      - "8080:8080"
+    environment:
+      # Must match REDIRECT_URI on the frontend — the browser follows this redirect,
+      # so it must be reachable from the user's machine (localhost), not the Docker network.
+      REDIRECT_URI: http://localhost:9000/callback
+      SIGNING_KEY: super-secret-signing-key-change-in-prod
+
+  api:
+    build:
+      context: .
+      args:
+        CMD: api
+    ports:
+      - "8081:8081"
+    environment:
+      # Must match the signing key used by the auth server to verify JWTs.
+      SIGNING_KEY: super-secret-signing-key-change-in-prod
+
+  frontend:
+    build:
+      context: .
+      args:
+        CMD: frontend
+    ports:
+      - "9000:9000"
+    environment:
+      # Server-to-server calls inside Docker use service names, not localhost.
+      AUTH_SERVER: http://authserver:8080
+      API_SERVER: http://api:8081
+      # Browser redirects must use localhost — the browser can't resolve Docker service names.
+      AUTH_SERVER_PUBLIC: http://localhost:8080
+      # The browser follows this redirect, so it must be localhost from the user's machine.
+      REDIRECT_URI: http://localhost:9000/callback
+    depends_on:
+      - authserver
+      - api

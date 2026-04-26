@@ -145,7 +145,13 @@ The auth server never validates `state` — it has no idea what it means. Only y
 
 ## Running & Testing
 
-**1. Start all three servers** (three terminals):
+**With Docker (recommended):**
+
+```bash
+docker compose up --build
+```
+
+**Without Docker** (three terminals):
 
 ```bash
 go run ./cmd/authserver   # auth server  :8080
@@ -153,10 +159,10 @@ go run ./cmd/api          # api server   :8081
 go run ./cmd/frontend     # frontend     :9000
 ```
 
-**2. Open in browser:**
+**Open in browser:**
 
 ```
-http://localhost:9000/login
+http://localhost:9000/profile
 ```
 
 The frontend automatically:
