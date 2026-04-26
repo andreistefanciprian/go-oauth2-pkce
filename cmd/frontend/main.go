@@ -165,17 +165,27 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use the access token (JWT) to call the protected API.
-	// The API server validates the token locally — it never calls the auth server.
-	profile, err := fetchProfile(tokenResp["access_token"].(string))
+	// Generate a session ID — the browser gets only this, never the JWT itself.
+	sessionID, err := generateSessionID()
 	if err != nil {
-		slog.Error("Profile fetch failed", "error", err)
-		http.Error(w, "failed to fetch profile", http.StatusInternalServerError)
+		http.Error(w, "failed to generate session", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(profile)
+	// Store the JWT server-side, keyed by session ID.
+	tokens.save(sessionID, tokenResp["access_token"].(string))
+
+	// Give the session ID to the browser as an HttpOnly cookie so it can't be
+	// read by JavaScript — mitigates XSS token theft.
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_id",
+		Value:    sessionID,
+		Path:     "/",
+		HttpOnly: true,
+	})
+
+	slog.Info("Session created, redirecting to profile", "session_id", sessionID)
+	http.Redirect(w, r, "/profile", http.StatusFound)
 }
 
 // exchangeCode calls POST /token on the auth server.
